@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+    "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Nom de l'exécutable dans Contents/MacOS/ -->
+    <key>CFBundleExecutable</key>
+    <string>SNCFWifi</string>
+
+    <key>CFBundleIdentifier</key>
+    <string>fr.sncf.wifi-widget</string>
+
+    <key>CFBundleName</key>
+    <string>SNCFWifi</string>
+
+    <key>CFBundleDisplayName</key>
+    <string>SNCF WiFi</string>
+
+    <key>CFBundleVersion</key>
+    <string>1</string>
+
+    <key>CFBundleShortVersionString</key>
+    <string>1.0.0</string>
+
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+
+    <key>NSPrincipalClass</key>
+    <string>NSApplication</string>
+
+    <!-- Cache l'icône dans le Dock : uniquement la barre des menus -->
+    <key>LSUIElement</key>
+    <true/>
+
+    <!-- Autorise les connexions HTTP non chiffrées vers wifi.sncf
+         (l'API du train est en HTTP sur le LAN du train) -->
+    <key>NSAppTransportSecurity</key>
+    <dict>
+        <key>NSExceptionDomains</key>
+        <dict>
+            <key>wifi.sncf</key>
+            <dict>
+                <key>NSExceptionAllowsInsecureHTTPLoads</key>
+                <true/>
+                <key>NSIncludesSubdomains</key>
+                <true/>
+            </dict>
+        </dict>
+    </dict>
+</dict>
+</plist>
