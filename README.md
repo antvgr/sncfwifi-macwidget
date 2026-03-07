@@ -1,0 +1,1 @@
+# sncfwifi-macwidget
