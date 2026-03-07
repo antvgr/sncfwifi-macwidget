@@ -4,6 +4,11 @@
 
 Un widget pour la bare de menus de MacOs, permettant grâce à l'API du portail Wifi TGV Inoui de suivre les informations de votre trajet.
 
+<p align="center">
+  <img src="img/IMG1.png" width="45%" />
+  <img src="img/IMG2.png" width="45%" />
+</p>
+
 ## Fonctionnalités 🛠
 
 - Intégration légère dans la barre des menus macOS.

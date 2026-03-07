@@ -270,7 +270,7 @@ final class MenuBarController: NSObject {
         // Menu Debug
         if !rawData.isEmpty {
             m.addItem(.separator())
-            let debugItem = label("Debug & API Brutes", symbol: "ladybug.fill")
+            let debugItem = label("Debug", symbol: "ladybug.fill")
             let debugMenu = NSMenu()
             
             let copyItem = label("Copier le JSON (presse-papiers)", symbol: "doc.on.doc.fill")
