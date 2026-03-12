@@ -64,7 +64,9 @@ final class MenuBarController: NSObject {
                            bar: [String: Any]?,
                            stats: [String: Any]?) -> (String, NSMenu) {
 
-        let speed = safeInt(gps?["speed"])
+        // L'API retourne la vitesse en m/s, on convertit en km/h
+        let speedRaw = asDouble(gps?["speed"]) ?? 0.0
+        let speed = Int(speedRaw * 3.6)
 
         var trainNumber:       String?
         var originLabel:       String?
@@ -116,7 +118,7 @@ final class MenuBarController: NSObject {
             var isStopped = false
             var stoppedAt = arrIndex
             
-            if speed < 10 {
+            if speed < 36 {
                 if distToDep < 1500 {
                     isStopped = true
                     stoppedAt = depIndex
