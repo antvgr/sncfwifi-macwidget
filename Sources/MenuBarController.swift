@@ -30,7 +30,7 @@ final class MenuBarController: NSObject {
     // MARK: - Refresh
 
     @objc func refresh() {
-        apiClient.fetchAll { [weak self] gps, details, bar, stats in
+        apiClient.fetchAll { [weak self] gps, details, bar, stats, status in
             guard let self else { return }
             if gps == nil && details == nil {
                 self.statusItem.button?.image = NSImage(systemSymbolName: "wifi.slash", accessibilityDescription: nil)
@@ -38,7 +38,7 @@ final class MenuBarController: NSObject {
                 self.statusItem.menu = self.notConnectedMenu()
             } else {
                 self.statusItem.button?.image = NSImage(systemSymbolName: "tram.fill", accessibilityDescription: nil)
-                let (title, menu) = self.trainMenu(gps: gps, details: details, bar: bar, stats: stats)
+                let (title, menu) = self.trainMenu(gps: gps, details: details, bar: bar, stats: stats, status: status)
                 // Ajoute un espace avant le texte pour aérer par rapport à l'icône
                 self.statusItem.button?.title = title.isEmpty ? "" : " \(title)"
                 self.statusItem.menu = menu
@@ -62,7 +62,8 @@ final class MenuBarController: NSObject {
     private func trainMenu(gps: [String: Any]?,
                            details: [String: Any]?,
                            bar: [String: Any]?,
-                           stats: [String: Any]?) -> (String, NSMenu) {
+                           stats: [String: Any]?,
+                           status: [String: Any]?) -> (String, NSMenu) {
 
         let speed = safeInt(gps?["speed"])
 
@@ -244,7 +245,37 @@ final class MenuBarController: NSObject {
             m.addItem(label(networkStr, symbol: wifiSymbol))
         }
 
-        // 5. Affluence au Bar
+        // 5. Consommation data
+        if let status = status {
+            let remaining = safeInt(status["remaining_data"])
+            let consumed  = safeInt(status["consumed_data"])
+            let total = remaining + consumed
+
+            if total > 0 {
+                let remainingMB = String(format: "%.1f", Double(remaining) / 1000.0)
+                let consumedMB  = String(format: "%.1f", Double(consumed) / 1000.0)
+                let totalMB     = String(format: "%.1f", Double(total) / 1000.0)
+                let pct = Int(Double(consumed) * 100.0 / Double(total))
+
+                // Barre de progression visuelle
+                let filled = pct / 10
+                let empty  = 10 - filled
+                let bar    = String(repeating: "▓", count: filled) + String(repeating: "░", count: empty)
+
+                m.addItem(label("Data : \(consumedMB) / \(totalMB) Mo utilisés (\(pct)%)", symbol: "arrow.up.arrow.down.circle"))
+                m.addItem(label("  \(bar)  \(remainingMB) Mo restants"))
+            }
+
+            if let nextReset = status["next_reset"] as? NSNumber {
+                let resetDate = Date(timeIntervalSince1970: nextReset.doubleValue / 1000.0)
+                let tf = DateFormatter()
+                tf.dateFormat = "HH:mm"
+                tf.timeZone = .current
+                m.addItem(label("  Prochain reset : \(tf.string(from: resetDate))"))
+            }
+        }
+
+        // 6. Affluence au Bar
         if let barDict = bar {
             // Selon l'API, parfois "attendance": 0, parfois "isBarQueueEmpty": true
             let isQueueEmpty = (barDict["isBarQueueEmpty"] as? Bool) == true
@@ -265,6 +296,7 @@ final class MenuBarController: NSObject {
         if let d = details { rawData["details"] = d }
         if let b = bar { rawData["bar"] = b }
         if let s = stats { rawData["stats"] = s }
+        if let st = status { rawData["status"] = st }
         self.lastRawData = rawData
 
         // Menu Debug
@@ -291,6 +323,9 @@ final class MenuBarController: NSObject {
             }
             if let s = stats, !s.isEmpty {
                 debugMenu.addItem(submenuItem(title: "API Stats (brut)", data: s, symbol: "antenna.radiowaves.left.and.right"))
+            }
+            if let st = status, !st.isEmpty {
+                debugMenu.addItem(submenuItem(title: "API Status (brut)", data: st, symbol: "arrow.up.arrow.down.circle"))
             }
             
             debugItem.submenu = debugMenu

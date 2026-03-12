@@ -8,7 +8,8 @@ final class TrainAPIClient {
     private let detailsURL    = URL(string: "https://wifi.sncf/router/api/train/details")!
     private let barURL        = URL(string: "https://wifi.sncf/router/api/bar/attendance")!
     private let statsURL      = URL(string: "https://wifi.sncf/router/api/connection/statistics")!
-    
+    private let statusURL     = URL(string: "https://wifi.sncf/router/api/connection/status")!
+
     private let timeout: TimeInterval = 5
 
     /// Récupère toutes les infos en parallèle, notifie sur le main thread.
@@ -16,22 +17,24 @@ final class TrainAPIClient {
         _ gps: [String: Any]?,
         _ details: [String: Any]?, // Retourne `progress` ou `details`
         _ bar: [String: Any]?,
-        _ stats: [String: Any]?
+        _ stats: [String: Any]?,
+        _ status: [String: Any]?
     ) -> Void) {
         let group = DispatchGroup()
-        
+
         var gpsData: [String: Any]?
         var progressData: [String: Any]?
         var detailsData: [String: Any]?
         var barData: [String: Any]?
         var statsData: [String: Any]?
+        var statusData: [String: Any]?
 
         group.enter()
         fetch(url: gpsURL) { gpsData = $0; group.leave() }
 
         group.enter()
         fetch(url: progressURL) { progressData = $0; group.leave() }
-        
+
         group.enter()
         fetch(url: detailsURL) { detailsData = $0; group.leave() }
 
@@ -41,8 +44,11 @@ final class TrainAPIClient {
         group.enter()
         fetch(url: statsURL) { statsData = $0; group.leave() }
 
+        group.enter()
+        fetch(url: statusURL) { statusData = $0; group.leave() }
+
         group.notify(queue: .main) {
-            completion(gpsData, progressData ?? detailsData, barData, statsData)
+            completion(gpsData, progressData ?? detailsData, barData, statsData, statusData)
         }
     }
 
