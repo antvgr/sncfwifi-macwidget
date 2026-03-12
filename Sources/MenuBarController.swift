@@ -258,9 +258,10 @@ final class MenuBarController: NSObject {
                 let pct = Int(Double(consumed) * 100.0 / Double(total))
 
                 // Barre de progression visuelle
-                let filled = pct / 10
-                let empty  = 10 - filled
-                let bar    = String(repeating: "▓", count: filled) + String(repeating: "░", count: empty)
+                let safePct = max(0, min(100, pct))
+                let filled  = max(0, min(10, safePct / 10))
+                let empty   = 10 - filled
+                let bar     = String(repeating: "▓", count: filled) + String(repeating: "░", count: empty)
 
                 m.addItem(label("Data : \(consumedMB) / \(totalMB) Mo utilisés (\(pct)%)", symbol: "arrow.up.arrow.down.circle"))
                 m.addItem(label("  \(bar)  \(remainingMB) Mo restants"))
