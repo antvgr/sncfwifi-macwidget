@@ -271,7 +271,7 @@ final class MenuBarController: NSObject {
                 let empty   = 10 - filled
                 let bar     = String(repeating: "▓", count: filled) + String(repeating: "░", count: empty)
 
-                m.addItem(label("Data : \(consumedMB) / \(totalMB) Mo utilisés (\(pct)%)", symbol: "arrow.up.arrow.down.circle"))
+                m.addItem(label("Data : \(consumedMB) / \(totalMB) Mo utilisés (\(safePct)%)", symbol: "arrow.up.arrow.down.circle"))
                 m.addItem(label("  \(bar)  \(remainingMB) Mo restants"))
             }
 
