@@ -14,6 +14,9 @@ STATE = {
     "speed": 285,
     "wifiQuality": 4,
     "devices": 246,
+    "consumedData": 12000,
+    "remainingData": 28000,
+    "nextResetMinutes": 95,
     "barAttendance": 3,
     "barQueueEmpty": False,
     "stationStatus": "moving",  # moving | station
@@ -100,7 +103,14 @@ def current_payloads():
         "quality": int(state.get("wifiQuality", 3)),
         "devices": int(state.get("devices", 180)),
     }
-    return gps, progress, bar, stats
+    next_reset_minutes = max(0, int(state.get("nextResetMinutes", 95)))
+    next_reset_ms = int((datetime.now(timezone.utc) + timedelta(minutes=next_reset_minutes)).timestamp() * 1000)
+    status = {
+        "consumed_data": max(0, int(state.get("consumedData", 12000))),
+        "remaining_data": max(0, int(state.get("remainingData", 28000))),
+        "next_reset": next_reset_ms,
+    }
+    return gps, progress, bar, stats, status
 
 
 HTML = """<!doctype html>
@@ -131,8 +141,11 @@ HTML = """<!doctype html>
       <div><label>Index gare courante (0..2)</label><input id=\"currentStationIndex\" type=\"number\" min=\"0\" max=\"2\" /></div>
       <div><label>Minutes prochaine gare</label><input id=\"minutesToNextStop\" type=\"number\" min=\"0\" max=\"120\" /></div>
       <div><label>Minutes gare finale</label><input id=\"minutesToFinalStop\" type=\"number\" min=\"0\" max=\"240\" /></div>
-      <div><label>Qualite WiFi (1..5)</label><input id=\"wifiQuality\" type=\"number\" min=\"1\" max=\"5\" /></div>
-      <div><label>Appareils connectes</label><input id=\"devices\" type=\"number\" min=\"0\" /></div>
+            <div><label>Qualite WiFi (1..5)</label><input id=\"wifiQuality\" type=\"number\" min=\"1\" max=\"5\" /></div>
+            <div><label>Appareils connectes</label><input id=\"devices\" type=\"number\" min=\"0\" /></div>
+            <div><label>Data consommee</label><input id=\"consumedData\" type=\"number\" min=\"0\" /></div>
+            <div><label>Data restante</label><input id=\"remainingData\" type=\"number\" min=\"0\" /></div>
+            <div><label>Reset dans (minutes)</label><input id=\"nextResetMinutes\" type=\"number\" min=\"0\" max=\"1440\" /></div>
       <div><label>File Bar (personnes)</label><input id=\"barAttendance\" type=\"number\" min=\"0\" /></div>
       <div><label>File vide</label><select id=\"barQueueEmpty\"><option value=\"false\">Non</option><option value=\"true\">Oui</option></select></div>
     </div>
@@ -159,6 +172,9 @@ HTML = """<!doctype html>
         minutesToFinalStop: Number(document.getElementById('minutesToFinalStop').value),
         wifiQuality: Number(document.getElementById('wifiQuality').value),
         devices: Number(document.getElementById('devices').value),
+        consumedData: Number(document.getElementById('consumedData').value),
+        remainingData: Number(document.getElementById('remainingData').value),
+        nextResetMinutes: Number(document.getElementById('nextResetMinutes').value),
         barAttendance: Number(document.getElementById('barAttendance').value),
         barQueueEmpty: document.getElementById('barQueueEmpty').value === 'true'
       };
@@ -194,7 +210,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         path = urlparse(self.path).path
-        gps, progress, bar, stats = current_payloads()
+        gps, progress, bar, stats, status = current_payloads()
 
         if path == "/":
             self._html(HTML)
@@ -215,6 +231,9 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/router/api/connection/statistics":
             self._json(200, stats)
             return
+        if path == "/router/api/connection/status":
+            self._json(200, status)
+            return
 
         self._json(404, {"error": "not_found"})
 
@@ -234,7 +253,7 @@ class Handler(BaseHTTPRequestHandler):
 
         with STATE_LOCK:
             for key in (
-                "trainId", "speed", "wifiQuality", "devices", "barAttendance", "barQueueEmpty",
+                "trainId", "speed", "wifiQuality", "devices", "consumedData", "remainingData", "nextResetMinutes", "barAttendance", "barQueueEmpty",
                 "stationStatus", "currentStationIndex", "minutesToNextStop", "minutesToFinalStop"
             ):
                 if key in payload:

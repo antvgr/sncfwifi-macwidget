@@ -11,6 +11,12 @@ final class MenuBarController: NSObject {
     private let apiClient  = TrainAPIClient()
     private var timer: Timer?
     private var lastRawData: [String: Any]?
+    private static let resetTimeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm"
+        formatter.timeZone = .autoupdatingCurrent
+        return formatter
+    }()
     private let locationManager = CLLocationManager()
     private let notificationCenter = UNUserNotificationCenter.current()
 
@@ -85,7 +91,7 @@ final class MenuBarController: NSObject {
             }
         }
 
-        apiClient.fetchAll { [weak self] gps, details, bar, stats in
+        apiClient.fetchAll { [weak self] gps, details, bar, stats, status in
             guard let self else { return }
 
             // Conserver un snapshot debug même si l'API est indisponible.
@@ -99,6 +105,7 @@ final class MenuBarController: NSObject {
             if let d = details { snapshot["details"] = d }
             if let b = bar { snapshot["bar"] = b }
             if let s = stats { snapshot["stats"] = s }
+            if let st = status { snapshot["status"] = st }
             self.lastRawData = snapshot
 
             if gps == nil && details == nil {
@@ -106,7 +113,7 @@ final class MenuBarController: NSObject {
                 self.statusItem.button?.title = ""
                 self.statusItem.menu = self.notConnectedMenu()
             } else {
-                let (title, customImage, menu) = self.trainMenu(gps: gps, details: details, bar: bar, stats: stats)
+                let (title, customImage, menu) = self.trainMenu(gps: gps, details: details, bar: bar, stats: stats, status: status)
                 if let img = customImage {
                     self.statusItem.button?.title = ""
                     self.statusItem.button?.image = img
@@ -237,7 +244,8 @@ final class MenuBarController: NSObject {
     private func trainMenu(gps: [String: Any]?,
                            details: [String: Any]?,
                            bar: [String: Any]?,
-                           stats: [String: Any]?) -> (String, NSImage?, NSMenu) {
+                           stats: [String: Any]?,
+                           status: [String: Any]?) -> (String, NSImage?, NSMenu) {
 
         // L'API retourne la vitesse en m/s, on convertit en km/h
         let speedRaw = asDouble(gps?["speed"]) ?? 0.0
@@ -498,7 +506,36 @@ final class MenuBarController: NSObject {
             m.addItem(infoLabel(networkStr, symbol: wifiSymbol))
         }
 
-        // 5. Affluence au Bar
+        // 5. Consommation data
+        if let status = status {
+            let remaining = safeInt(status["remaining_data"])
+            let consumed = safeInt(status["consumed_data"])
+            let total = remaining + consumed
+
+            if total > 0 {
+                let remainingMB = String(format: "%.1f", Double(remaining) / 1000.0)
+                let consumedMB = String(format: "%.1f", Double(consumed) / 1000.0)
+                let totalMB = String(format: "%.1f", Double(total) / 1000.0)
+                let pct = Int(Double(consumed) * 100.0 / Double(total))
+
+                // Protège l'UI contre des valeurs API incohérentes.
+                let safePct = max(0, min(100, pct))
+                let filled = max(0, min(10, safePct / 10))
+                let empty = 10 - filled
+                let usageBar = String(repeating: "▓", count: filled) + String(repeating: "░", count: empty)
+
+                m.addItem(infoLabel("Data : \(consumedMB) / \(totalMB) Mo utilisés (\(safePct)%)", symbol: "arrow.up.arrow.down.circle"))
+                m.addItem(infoLabel("  \(usageBar)  \(remainingMB) Mo restants"))
+            }
+
+            if let nextResetMs = asDouble(status["next_reset"]) {
+                let resetDate = Date(timeIntervalSince1970: nextResetMs / 1000.0)
+                let tf = MenuBarController.resetTimeFormatter
+                m.addItem(infoLabel("  Prochain reset : \(tf.string(from: resetDate))"))
+            }
+        }
+
+        // 6. Affluence au Bar
         if let barDict = bar {
             // Selon l'API, parfois "attendance": 0, parfois "isBarQueueEmpty": true
             let isQueueEmpty = (barDict["isBarQueueEmpty"] as? Bool) == true
@@ -551,6 +588,7 @@ final class MenuBarController: NSObject {
         if let d = details { rawData["details"] = d }
         if let b = bar { rawData["bar"] = b }
         if let s = stats { rawData["stats"] = s }
+        if let st = status { rawData["status"] = st }
         if let n = notificationDebug { rawData["notification"] = n }
         self.lastRawData = rawData
 
@@ -631,6 +669,9 @@ final class MenuBarController: NSObject {
             }
             if let s = stats, !s.isEmpty {
                 debugMenu.addItem(submenuItem(title: "API Stats (brut)", data: s, symbol: "antenna.radiowaves.left.and.right"))
+            }
+            if let st = status, !st.isEmpty {
+                debugMenu.addItem(submenuItem(title: "API Status (brut)", data: st, symbol: "arrow.up.arrow.down.circle"))
             }
         }
 

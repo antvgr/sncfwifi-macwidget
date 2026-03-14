@@ -30,9 +30,9 @@ class MockTrainData {
         // Pas d'état à arrêter: la source est externe (serveur local).
     }
 
-    func fetchAll(completion: @escaping (_ gps: [String: Any]?, _ details: [String: Any]?, _ bar: [String: Any]?, _ stats: [String: Any]?) -> Void) {
+    func fetchAll(completion: @escaping (_ gps: [String: Any]?, _ details: [String: Any]?, _ bar: [String: Any]?, _ stats: [String: Any]?, _ status: [String: Any]?) -> Void) {
         guard let baseURL else {
-            DispatchQueue.main.async { completion(nil, nil, nil, nil) }
+            DispatchQueue.main.async { completion(nil, nil, nil, nil, nil) }
             return
         }
 
@@ -41,12 +41,14 @@ class MockTrainData {
         var detailsData: [String: Any]?
         var barData: [String: Any]?
         var statsData: [String: Any]?
+        var statusData: [String: Any]?
 
         let endpoints: [(String, ([String: Any]?) -> Void)] = [
             ("/router/api/train/gps", { gpsData = $0 }),
             ("/router/api/train/progress", { detailsData = $0 }),
             ("/router/api/bar/attendance", { barData = $0 }),
-            ("/router/api/connection/statistics", { statsData = $0 })
+            ("/router/api/connection/statistics", { statsData = $0 }),
+            ("/router/api/connection/status", { statusData = $0 })
         ]
 
         for (path, setter) in endpoints {
@@ -59,7 +61,7 @@ class MockTrainData {
         }
 
         group.notify(queue: .main) {
-            completion(gpsData, detailsData, barData, statsData)
+            completion(gpsData, detailsData, barData, statsData, statusData)
         }
     }
 
