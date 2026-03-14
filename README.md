@@ -23,7 +23,9 @@ Un widget pour la barre de menus macOS qui exploite l'API du portail WiFi TGV In
 2. Glissez `SNCFWifi.app` dans votre dossier `Applications`
 3. Double-cliquez pour lancer — l'icône apparaît dans la barre des menus
 
-> **macOS peut bloquer l'app** (non signée avec un certificat Apple payant) : faites un **clic droit → Ouvrir** la première fois.
+> **macOS bloque l'app** (non signée avec un certificat Apple Developer) lors du premier lancement. Deux options :
+> - **Méthode simple** : faites un **clic droit → Ouvrir** sur `SNCFWifi.app`, puis cliquez **Ouvrir** dans la fenêtre d'avertissement
+> - **Via le Terminal** : après avoir déplacé l'app dans `/Applications`, exécutez `xattr -cr /Applications/SNCFWifi.app` puis double-cliquez normalement
 
 💡 **Lancement automatique au démarrage** : `Réglages Système > Général > Éléments de connexion` → cliquez `+` et ajoutez `SNCFWifi.app`.
 
