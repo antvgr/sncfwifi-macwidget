@@ -9,6 +9,9 @@ jobs:
   build:
     runs-on: macos-latest
 
+    permissions:
+      contents: write
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -19,19 +22,23 @@ jobs:
       - name: Package app
         run: zip -r SNCFWifi.zip SNCFWifi.app
 
-      # Sur chaque push sur main → artefact temporaire (7 jours)
-      - name: Upload artifact (CI)
+      # Push sur main → met à jour la release "latest" (rolling release)
+      - name: Update rolling release (latest)
         if: github.ref_type != 'tag'
-        uses: actions/upload-artifact@v4
+        uses: softprops/action-gh-release@v2
         with:
-          name: SNCFWifi
-          path: SNCFWifi.zip
-          retention-days: 7
+          tag_name: latest
+          name: "Dernière version (latest)"
+          prerelease: true
+          files: SNCFWifi.zip
+          generate_release_notes: true
+          make_latest: false
 
-      # Sur un tag (ex: v1.2.0) → Release GitHub avec le zip en pièce jointe
-      - name: Create GitHub Release
+      # Push d'un tag (ex: v1.2.0) → Release officielle versionnée
+      - name: Create versioned release
         if: github.ref_type == 'tag'
         uses: softprops/action-gh-release@v2
         with:
           files: SNCFWifi.zip
           generate_release_notes: true
+          make_latest: true
