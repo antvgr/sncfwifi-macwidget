@@ -14,7 +14,7 @@ final class MenuBarController: NSObject {
     private static let resetTimeFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateFormat = "HH:mm"
-        formatter.timeZone = .current
+        formatter.timeZone = .autoupdatingCurrent
         return formatter
     }()
 
