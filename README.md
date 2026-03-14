@@ -40,7 +40,7 @@ Un widget pour la barre de menus macOS qui exploite l'API du portail WiFi TGV In
 
 ## Prérequis ⚙️
 
-- macOS (Apple Silicon ou Intel)
+- macOS 11 (Big Sur) ou plus récent — Apple Silicon et Intel (binaire universel)
 - Connexion au réseau WiFi d'un TGV Inoui pour que l'API réponde
 - *(pour compiler)* Xcode Command Line Tools (`xcode-select --install`)
 

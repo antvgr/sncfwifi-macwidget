@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # build.sh — Compile et empaquète l'app SNCFWifi dans SNCFWifi.app
+# Produit un binaire universel (arm64 + x86_64) compatible Intel et Apple Silicon
 set -euo pipefail
 
 APP_NAME="SNCFWifi"
@@ -9,24 +10,42 @@ MACOS_DIR="${CONTENTS}/MacOS"
 RESOURCES_DIR="${CONTENTS}/Resources"
 SRC_DIR="Sources"
 
-echo "🔨 Compilation de ${APP_NAME} ($(uname -m))…"
+SWIFT_SOURCES=(
+    "${SRC_DIR}/main.swift"
+    "${SRC_DIR}/AppDelegate.swift"
+    "${SRC_DIR}/TrainAPIClient.swift"
+    "${SRC_DIR}/MenuBarController.swift"
+    "${SRC_DIR}/MockTrainData.swift"
+    "${SRC_DIR}/StatusBarImageGenerator.swift"
+)
+
+echo "🔨 Compilation de ${APP_NAME} (binaire universel arm64 + x86_64)…"
 
 # Nettoyage du bundle précédent
 rm -rf "${APP_BUNDLE}"
 mkdir -p "${MACOS_DIR}" "${RESOURCES_DIR}"
 
-# Compilation de tous les fichiers Swift en un seul binaire
-# (swiftc cible automatiquement l'architecture du Mac courant)
-swiftc \
-    "${SRC_DIR}/main.swift" \
-    "${SRC_DIR}/AppDelegate.swift" \
-    "${SRC_DIR}/TrainAPIClient.swift" \
-    "${SRC_DIR}/MenuBarController.swift" \
-    "${SRC_DIR}/MockTrainData.swift" \
-    "${SRC_DIR}/StatusBarImageGenerator.swift" \
+# Compilation arm64
+swiftc "${SWIFT_SOURCES[@]}" \
     -framework Cocoa \
     -O \
-    -o "${MACOS_DIR}/${APP_NAME}"
+    -target arm64-apple-macos11.0 \
+    -o "/tmp/${APP_NAME}_arm64"
+
+# Compilation x86_64
+swiftc "${SWIFT_SOURCES[@]}" \
+    -framework Cocoa \
+    -O \
+    -target x86_64-apple-macos11.0 \
+    -o "/tmp/${APP_NAME}_x86_64"
+
+# Fusion en binaire universel
+lipo -create \
+    "/tmp/${APP_NAME}_arm64" \
+    "/tmp/${APP_NAME}_x86_64" \
+    -output "${MACOS_DIR}/${APP_NAME}"
+
+rm -f "/tmp/${APP_NAME}_arm64" "/tmp/${APP_NAME}_x86_64"
 
 # Info.plist dans Contents/ (pas Resources/)
 cp Resources/Info.plist "${CONTENTS}/Info.plist"
