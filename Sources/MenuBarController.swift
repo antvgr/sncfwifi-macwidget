@@ -10,7 +10,18 @@ final class MenuBarController: NSObject {
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     private let apiClient  = TrainAPIClient()
     private var timer: Timer?
+    private var clockTimer: Timer?
     private var lastRawData: [String: Any]?
+
+    // Cache pour le redraw de l'icône sans appel API
+    private var cachedArrivalDate: Date?
+    private var cachedDestShort: String = ""
+    private var cachedGlobalProgress: Double = 0.0
+    private var cachedSpeed: Int = 0
+    private var cachedIsStopped: Bool = false
+    private var cachedStoppedStation: String = ""
+    private var cachedDelayMins: Int = 0
+    private var cachedDelayCause: String = ""
     private static let resetTimeFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateFormat = "HH:mm"
@@ -61,6 +72,59 @@ final class MenuBarController: NSObject {
         timer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
             self?.refresh()
         }
+        clockTimer = Timer.scheduledTimer(withTimeInterval: 10, repeats: true) { [weak self] _ in
+            self?.redrawTitle()
+        }
+    }
+
+    @objc private func redrawTitle() {
+        if cachedDelayMins > 0 {
+            // Affiche le retard pendant 5s, puis repasse au texte normal
+            var t = "⚠ +\(cachedDelayMins)min"
+            if !cachedDelayCause.isEmpty { t += " · \(cachedDelayCause)" }
+            applyTitleImage(text: t)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in
+                self?.redrawNormalTitle()
+            }
+        } else {
+            redrawNormalTitle()
+        }
+    }
+
+    private func redrawNormalTitle() {
+        let text: String
+        if cachedIsStopped && !cachedStoppedStation.isEmpty {
+            text = "En gare de \(cachedStoppedStation)"
+        } else {
+            var t = cachedDestShort
+            if let arrival = cachedArrivalDate, arrival > Date() {
+                let diffMins = Int(arrival.timeIntervalSinceNow / 60)
+                let timeStr: String
+                if diffMins >= 60 {
+                    let h = diffMins / 60
+                    let m = diffMins % 60
+                    timeStr = m > 0 ? "\(h)h\(String(format: "%02d", m))" : "\(h)h"
+                } else {
+                    timeStr = "\(diffMins)min"
+                }
+                t = t.isEmpty ? timeStr : "\(t) dans \(timeStr)"
+            }
+            if cachedSpeed > 0 {
+                let speedStr = "\(cachedSpeed)km/h"
+                t = t.isEmpty ? speedStr : "\(t) · \(speedStr)"
+            }
+            text = t
+        }
+        applyTitleImage(text: text)
+    }
+
+    private func applyTitleImage(text: String) {
+        guard !text.isEmpty,
+              let img = StatusBarImageGenerator.draw(text: text, progress: cachedGlobalProgress)
+        else { return }
+        statusItem.button?.title = ""
+        statusItem.button?.image = img
+        statusItem.button?.imagePosition = .imageOnly
     }
 
     // MARK: - Refresh
@@ -124,6 +188,10 @@ final class MenuBarController: NSObject {
                     self.statusItem.button?.title = title.isEmpty ? "" : " \(title)"
                 }
                 self.statusItem.menu = menu
+                // Applique le texte delay-aware (rotation) après avoir peuplé le cache
+                if self.cachedArrivalDate != nil || self.cachedIsStopped {
+                    self.redrawTitle()
+                }
             }
         }
     }
@@ -257,6 +325,8 @@ final class MenuBarController: NSObject {
         var nextStopIndex:     Int = 0
         var isStoppedAtStation: Bool = false
         var allStops:          [[String: Any]] = []
+        var trainDelayMins:    Int = 0
+        var trainDelayCause:   String = ""
 
         let currentLat = asDouble(gps?["latitude"]) ?? asDouble(gps?["lat"])
         let currentLon = asDouble(gps?["longitude"]) ?? asDouble(gps?["lon"]) ?? asDouble(gps?["lng"])
@@ -272,10 +342,33 @@ final class MenuBarController: NSObject {
         }
 
         if let det = details {
-            trainNumber = det["trainId"] as? String
+            // "number" = numéro commercial du train (ex: 6201), "trainId" = numéro de rame matériel
+            if let s = det["number"] as? String, !s.isEmpty {
+                trainNumber = s
+            } else if let n = det["number"] as? Int {
+                trainNumber = String(n)
+            } else if let n = det["number"] as? Double {
+                trainNumber = String(Int(n))
+            }
 
             allStops = (det["stops"] as? [[String: Any]]) ?? []
             destinationLabel = allStops.last?["label"]  as? String
+
+            // Retard global du train — la valeur est sur chaque arrêt, pas à la racine
+            trainDelayMins = safeInt(det["delay"])
+            if trainDelayMins == 0 { trainDelayMins = safeInt(allStops.last?["delay"]) }
+
+            // Raison du retard : d'abord dans events[], puis sur les arrêts
+            if let events = det["events"] as? [[String: Any]] {
+                trainDelayCause = events.first(where: { ($0["type"] as? String) == "RETARD" })
+                    .flatMap { $0["text"] as? String } ?? ""
+            }
+            if trainDelayCause.isEmpty {
+                trainDelayCause = (det["delayReason"] as? String)
+                    ?? allStops.first(where: { ($0["delayReason"] as? String)?.isEmpty == false })
+                        .flatMap { $0["delayReason"] as? String }
+                    ?? ""
+            }
 
             // Trouver le segment en cours (le premier qui n'est pas à 100%)
             var currentSegmentIndex = 0
@@ -355,7 +448,13 @@ final class MenuBarController: NSObject {
             let dateStr = arrivalStop["realDate"] as? String ?? arrivalStop["theoricDate"] as? String
             if let targetDate = parseDate(dateStr), targetDate > Date() {
                 let diffMins = Int(targetDate.timeIntervalSinceNow / 60)
-                timeRemainingStr = " \(diffMins)min"
+                if diffMins >= 60 {
+                    let h = diffMins / 60
+                    let m = diffMins % 60
+                    timeRemainingStr = m > 0 ? " \(h)h\(String(format: "%02d", m))" : " \(h)h"
+                } else if diffMins > 0 {
+                    timeRemainingStr = " \(diffMins)min"
+                }
             }
 
             if let notificationTargetStop = notificationTargetStop(allStops: allStops,
@@ -385,31 +484,43 @@ final class MenuBarController: NSObject {
                 }
             }
             
-            // Calcul de la progression
+            // Calcul de la progression basé sur le temps (départ → maintenant → arrivée cible)
             var globalProgress: Double = 0.0
-            let depIndexSafe = max(0, nextStopIndex - (isStoppedAtStation ? 0 : 1))
-            if allStops.indices.contains(depIndexSafe) {
-                let currentPct = (allStops[depIndexSafe]["progress"] as? [String: Any])?["progressPercentage"] as? Double ?? 0.0
-                
-                if arrivalStationIndex > 0 {
-                    var segmentsDone = Double(depIndexSafe)
-                    segmentsDone += currentPct / 100.0
-                    globalProgress = segmentsDone / Double(arrivalStationIndex)
-                }
+            let firstStop = allStops[0]
+            let firstDateStr = firstStop["realDate"] as? String ?? firstStop["theoricDate"] as? String
+            let arrDateStr = arrivalStop["realDate"] as? String ?? arrivalStop["theoricDate"] as? String
+            if let depDate = parseDate(firstDateStr), let arrDate = parseDate(arrDateStr), arrDate > depDate {
+                let totalDuration = arrDate.timeIntervalSince(depDate)
+                let elapsed = Date().timeIntervalSince(depDate)
+                globalProgress = max(0.0, min(1.0, elapsed / totalDuration))
             }
-            
-            if globalProgress > 1.0 { globalProgress = 1.0 }
             
             var text = ""
             if isStoppedAtStation, let station = nextStopLabel, !station.isEmpty {
-                text = "En gare de \(station)"
+                text = "En gare de \(shortStationName(station))"
             } else {
-                text = destLabel + timeRemainingStr
+                let shortDest = shortStationName(destLabel)
+                if !timeRemainingStr.isEmpty {
+                    text = "\(shortDest) dans\(timeRemainingStr)"
+                } else if !shortDest.isEmpty {
+                    text = shortDest
+                }
                 if speed > 0 {
-                    text += " · \(speed)km/h"
+                    let speedStr = "\(speed)km/h"
+                    text = text.isEmpty ? speedStr : "\(text) · \(speedStr)"
                 }
             }
             
+            // Mise en cache pour le redraw léger (clockTimer)
+            cachedArrivalDate = parseDate(arrivalStop["realDate"] as? String ?? arrivalStop["theoricDate"] as? String)
+            cachedDestShort = shortStationName(destLabel)
+            cachedGlobalProgress = globalProgress
+            cachedSpeed = speed
+            cachedIsStopped = isStoppedAtStation
+            cachedStoppedStation = nextStopLabel.map { shortStationName($0) } ?? ""
+            cachedDelayMins = trainDelayMins
+            cachedDelayCause = trainDelayCause
+
             customImage = StatusBarImageGenerator.draw(text: text, progress: globalProgress)
         } else {
             // Fallback s'il n'y a pas la liste des arrêts
@@ -438,6 +549,11 @@ final class MenuBarController: NSObject {
                 headerTitle += " à destination de \(dest)"
             }
             m.addItem(infoLabel(headerTitle, symbol: "tram.fill"))
+            if trainDelayMins > 0 {
+                var delayLine = "Retard : +\(trainDelayMins) min"
+                if !trainDelayCause.isEmpty { delayLine += " (\(trainDelayCause))" }
+                m.addItem(infoLabel(delayLine, symbol: "exclamationmark.triangle.fill"))
+            }
             m.addItem(.separator())
         } else {
             m.addItem(infoLabel("Train TGV INOUI", symbol: "tram.fill"))
@@ -481,6 +597,7 @@ final class MenuBarController: NSObject {
 
                 m.addItem(infoLabel(line, symbol: symbolStr))
             }
+
             m.addItem(.separator())
         }
 
@@ -516,37 +633,20 @@ final class MenuBarController: NSObject {
                 let remainingMB = String(format: "%.1f", Double(remaining) / 1000.0)
                 let consumedMB = String(format: "%.1f", Double(consumed) / 1000.0)
                 let totalMB = String(format: "%.1f", Double(total) / 1000.0)
-                let pct = Int(Double(consumed) * 100.0 / Double(total))
-
-                // Protège l'UI contre des valeurs API incohérentes.
-                let safePct = max(0, min(100, pct))
-                let filled = max(0, min(10, safePct / 10))
-                let empty = 10 - filled
-                let usageBar = String(repeating: "▓", count: filled) + String(repeating: "░", count: empty)
+                let consumedRatio = Double(consumed) / Double(total)
+                let safeRatio = max(0.0, min(1.0, consumedRatio))
+                let safePct = Int((safeRatio * 100.0).rounded())
+                let usageBar = progressBar(progress: safeRatio, width: 18)
 
                 m.addItem(infoLabel("Data : \(consumedMB) / \(totalMB) Mo utilisés (\(safePct)%)", symbol: "arrow.up.arrow.down.circle"))
-                m.addItem(infoLabel("  \(usageBar)  \(remainingMB) Mo restants"))
+                m.addItem(infoLabel("  \(usageBar)"))
+                m.addItem(infoLabel("  Restant : \(remainingMB) Mo"))
             }
 
             if let nextResetMs = asDouble(status["next_reset"]) {
                 let resetDate = Date(timeIntervalSince1970: nextResetMs / 1000.0)
                 let tf = MenuBarController.resetTimeFormatter
                 m.addItem(infoLabel("  Prochain reset : \(tf.string(from: resetDate))"))
-            }
-        }
-
-        // 6. Affluence au Bar
-        if let barDict = bar {
-            // Selon l'API, parfois "attendance": 0, parfois "isBarQueueEmpty": true
-            let isQueueEmpty = (barDict["isBarQueueEmpty"] as? Bool) == true
-            let attendance = (barDict["attendance"] as? Int) ?? -1
-            
-            if attendance == 0 || isQueueEmpty {
-                m.addItem(infoLabel("Bar : Pas d'attente 🎉", symbol: "cup.and.saucer.fill"))
-            } else if attendance > 0 {
-                m.addItem(infoLabel("Bar : Attente en cours (\(attendance) pers.)", symbol: "person.3.sequence.fill"))
-            } else {
-                m.addItem(infoLabel("Bar : Attente en cours", symbol: "person.3.sequence.fill"))
             }
         }
 
@@ -707,6 +807,34 @@ final class MenuBarController: NSObject {
 
     // MARK: - Helpers de construction
 
+    private func shortStationName(_ name: String) -> String {
+        let exact: [String: String] = [
+            "Paris - Gare de Lyon - Hall 1 & 2":                   "Paris Lyon",
+            "Paris Montparnasse 1 Et 2":            "Montparnasse",
+            "Paris Montparnasse":                   "Montparnasse",
+            "Paris Gare du Nord":                   "Paris Nord",
+            "Paris Saint-Lazare":                   "St-Lazare",
+            "Paris Est":                            "Paris Est",
+            "Marseille-Saint-Charles":              "Marseille",
+            "Marseille Saint-Charles":              "Marseille",
+            "Lyon Part-Dieu":                       "Lyon",
+            "Lyon Perrache":                        "Lyon",
+            "Bordeaux Saint-Jean":                  "Bordeaux",
+            "Toulouse Matabiau":                    "Toulouse",
+            "Lille Flandres":                       "Lille",
+            "Montpellier Saint-Roch":               "Montpellier",
+            "Nice Ville":                           "Nice",
+            "Aix-en-Provence TGV":                  "Aix TGV",
+            "Valence TGV Rhône-Alpes Sud":          "Valence TGV",
+            "Aéroport Charles De Gaulle 2 Tgv":     "CDG TGV",
+            "Charles De Gaulle 2 Tgv":              "CDG TGV",
+            "Strasbourg Ville":                     "Strasbourg",
+            "Marne-La-Vallée Chessy":               "Marne La Vallée",
+        ]
+        if let short = exact[name] { return short }
+        return name.count > 15 ? String(name.prefix(14)) + "…" : name
+    }
+
     private func label(_ title: String, symbol: String? = nil) -> NSMenuItem {
         let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
         if let symbol = symbol, let img = NSImage(systemSymbolName: symbol, accessibilityDescription: nil) {
@@ -839,6 +967,39 @@ final class MenuBarController: NSObject {
         if let n = value as? NSNumber { return n.doubleValue }
         if let s = value as? String    { return Double(s) }
         return nil
+    }
+
+    private func asBool(_ value: Any?) -> Bool? {
+        guard let value else { return nil }
+        if let b = value as? Bool { return b }
+        if let n = value as? NSNumber { return n.intValue != 0 }
+        if let s = value as? String {
+            switch s.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+            case "true", "1", "yes", "oui":
+                return true
+            case "false", "0", "no", "non":
+                return false
+            default:
+                return nil
+            }
+        }
+        return nil
+    }
+
+    private func progressBar(progress: Double, width: Int) -> String {
+        let safeWidth = max(4, width)
+        let clamped = max(0.0, min(1.0, progress))
+        let cursorIndex = Int((clamped * Double(safeWidth - 1)).rounded())
+        var chars = Array<Character>(repeating: "─", count: safeWidth)
+
+        for i in 0..<safeWidth {
+            if i < cursorIndex {
+                chars[i] = "█"
+            }
+        }
+        chars[cursorIndex] = "●"
+
+        return "[" + String(chars) + "]"
     }
 
     private var isBeforeArrivalNotificationEnabled: Bool {

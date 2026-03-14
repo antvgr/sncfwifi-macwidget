@@ -11,6 +11,7 @@ PORT = 8787
 STATE_LOCK = Lock()
 STATE = {
     "trainId": "9812",
+    "trainNumber": "6201",
     "speed": 285,
     "wifiQuality": 4,
     "devices": 246,
@@ -18,7 +19,8 @@ STATE = {
     "remainingData": 28000,
     "nextResetMinutes": 95,
     "barAttendance": 3,
-    "barQueueEmpty": False,
+    "delayMins": 0,
+    "delayCause": "",
     "stationStatus": "moving",  # moving | station
     "currentStationIndex": 1,
     "minutesToNextStop": 6,
@@ -93,11 +95,14 @@ def current_payloads():
     }
     progress = {
         "trainId": str(state.get("trainId", "9812")),
+        "number": str(state.get("trainNumber", "6201")),
+        "delay": int(state.get("delayMins", 0)),
+        "delayReason": state.get("delayCause", ""),
+        "disruption": {"cause": state.get("delayCause", "")},
         "stops": stops,
     }
     bar = {
         "attendance": int(state.get("barAttendance", 0)),
-        "isBarQueueEmpty": bool(state.get("barQueueEmpty", False)),
     }
     stats = {
         "quality": int(state.get("wifiQuality", 3)),
@@ -135,7 +140,8 @@ HTML = """<!doctype html>
     <h1>SNCF WiFi Demo Server</h1>
     <p>API locale: <code>http://127.0.0.1:8787/router/api/...</code></p>
     <div class=\"grid\">
-      <div><label>Train ID</label><input id=\"trainId\" /></div>
+      <div><label>Train ID (rame)</label><input id="trainId" /></div>
+      <div><label>Numéro train</label><input id="trainNumber" /></div>
       <div><label>Statut</label><select id=\"stationStatus\"><option value=\"moving\">En mouvement</option><option value=\"station\">En gare</option></select></div>
       <div><label>Vitesse (km/h)</label><input id=\"speed\" type=\"number\" min=\"0\" max=\"360\" /></div>
       <div><label>Index gare courante (0..2)</label><input id=\"currentStationIndex\" type=\"number\" min=\"0\" max=\"2\" /></div>
@@ -146,8 +152,9 @@ HTML = """<!doctype html>
             <div><label>Data consommee</label><input id=\"consumedData\" type=\"number\" min=\"0\" /></div>
             <div><label>Data restante</label><input id=\"remainingData\" type=\"number\" min=\"0\" /></div>
             <div><label>Reset dans (minutes)</label><input id=\"nextResetMinutes\" type=\"number\" min=\"0\" max=\"1440\" /></div>
-      <div><label>File Bar (personnes)</label><input id=\"barAttendance\" type=\"number\" min=\"0\" /></div>
-      <div><label>File vide</label><select id=\"barQueueEmpty\"><option value=\"false\">Non</option><option value=\"true\">Oui</option></select></div>
+      <div><label>File Bar (personnes, 0 = pas d'attente)</label><input id="barAttendance" type="number" min="0" /></div>
+      <div><label>Retard (min)</label><input id="delayMins" type="number" min="0" /></div>
+      <div><label>Cause du retard</label><input id="delayCause" /></div>
     </div>
     <button onclick=\"save()\">Appliquer</button>
     <p id=\"status\"></p>
@@ -165,6 +172,7 @@ HTML = """<!doctype html>
     async function save() {
       const payload = {
         trainId: document.getElementById('trainId').value,
+        trainNumber: document.getElementById('trainNumber').value,
         stationStatus: document.getElementById('stationStatus').value,
         speed: Number(document.getElementById('speed').value),
         currentStationIndex: Number(document.getElementById('currentStationIndex').value),
@@ -176,7 +184,8 @@ HTML = """<!doctype html>
         remainingData: Number(document.getElementById('remainingData').value),
         nextResetMinutes: Number(document.getElementById('nextResetMinutes').value),
         barAttendance: Number(document.getElementById('barAttendance').value),
-        barQueueEmpty: document.getElementById('barQueueEmpty').value === 'true'
+        delayMins: Number(document.getElementById('delayMins').value),
+        delayCause: document.getElementById('delayCause').value,
       };
       const res = await fetch('/api/state', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) });
       document.getElementById('status').textContent = res.ok ? 'Etat mis a jour.' : 'Erreur de mise a jour.';

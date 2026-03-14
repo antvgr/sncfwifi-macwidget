@@ -1,0 +1,37 @@
+name: Build & Release
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build SNCFWifi.app
+        run: ./build.sh
+
+      - name: Package app
+        run: zip -r SNCFWifi.zip SNCFWifi.app
+
+      # Sur chaque push sur main → artefact temporaire (7 jours)
+      - name: Upload artifact (CI)
+        if: github.ref_type != 'tag'
+        uses: actions/upload-artifact@v4
+        with:
+          name: SNCFWifi
+          path: SNCFWifi.zip
+          retention-days: 7
+
+      # Sur un tag (ex: v1.2.0) → Release GitHub avec le zip en pièce jointe
+      - name: Create GitHub Release
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: SNCFWifi.zip
+          generate_release_notes: true
