@@ -22,6 +22,8 @@ swiftc \
     "${SRC_DIR}/AppDelegate.swift" \
     "${SRC_DIR}/TrainAPIClient.swift" \
     "${SRC_DIR}/MenuBarController.swift" \
+    "${SRC_DIR}/MockTrainData.swift" \
+    "${SRC_DIR}/StatusBarImageGenerator.swift" \
     -framework Cocoa \
     -O \
     -o "${MACOS_DIR}/${APP_NAME}"
@@ -29,8 +31,17 @@ swiftc \
 # Info.plist dans Contents/ (pas Resources/)
 cp Resources/Info.plist "${CONTENTS}/Info.plist"
 
-# Retirer l'attribut de quarantaine pour éviter le blocage Gatekeeper au premier lancement
-xattr -dr com.apple.quarantine "${APP_BUNDLE}" 2>/dev/null || true
+# Nettoyer tous les extended attributes (resource forks, quarantaine…) avant de signer
+find "${APP_BUNDLE}" -exec xattr -c {} \; 2>/dev/null || true
+
+# Signature ad-hoc : indispensable pour que TCC (Location Services) reconnaisse l'app
+# -s -          : signature ad-hoc (pas de certificat developer requis)
+# --deep        : signe aussi les frameworks/plugins embarqués
+# --force       : remplace toute signature existante
+codesign --force --deep -s - \
+    --identifier "fr.sncf.wifi-widget" \
+    --entitlements "Resources/entitlements.plist" \
+    "${APP_BUNDLE}"
 
 echo ""
 echo "✅ Application créée : ${APP_BUNDLE}"

@@ -46,3 +46,24 @@ Elle apparaîtra alors directement dans votre barre des menus !
 Ce projet a en parti été développé avec l'aide de l'Intelligence Artificielle.
 
 ![GitHub Copilot](https://cwab.nuclearrockstone.xyz/api/badge?name=copilot&theme=dark)
+
+## Mode Démo via Serveur Local
+
+Le mode Démo n'utilise plus un générateur interne. Il lit maintenant une API locale configurable, ce qui permet de simuler des cas proches de la vraie API SNCF.
+
+1. Lancer le serveur de démo:
+   ```bash
+   chmod +x start_demo_server.sh
+   ./start_demo_server.sh
+   ```
+2. Ouvrir l'interface de configuration:
+   - navigateur: `http://127.0.0.1:8787`
+   - ou via le menu de l'app: `Ouvrir le panneau Démo`
+3. Activer `Mode Démo (serveur local)` dans l'app.
+
+Endpoints exposés par le serveur local:
+- `GET /router/api/train/gps`
+- `GET /router/api/train/progress`
+- `GET /router/api/train/details`
+- `GET /router/api/bar/attendance`
+- `GET /router/api/connection/statistics`

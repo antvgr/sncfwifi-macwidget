@@ -18,6 +18,12 @@ final class TrainAPIClient {
         _ bar: [String: Any]?,
         _ stats: [String: Any]?
     ) -> Void) {
+        if MockTrainData.shared.isEnabled {
+            // En mode démo, lire les données depuis le serveur local configurable.
+            MockTrainData.shared.fetchAll(completion: completion)
+            return
+        }
+        
         let group = DispatchGroup()
         
         var gpsData: [String: Any]?

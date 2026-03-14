@@ -1,8 +1,15 @@
 import Cocoa
+import CoreLocation
 
-// Point d'entrée de l'app : pas d'icône Dock, uniquement barre des menus.
+// Si la permission localisation n'est pas encore accordée, démarrer en mode .regular
+// (icône Dock visible) pour que macOS puisse présenter la dialog TCC d'autorisation.
+// MenuBarController repasse en .accessory dès que la réponse est reçue.
 let app = NSApplication.shared
-app.setActivationPolicy(.accessory)
+if CLLocationManager().authorizationStatus == .notDetermined {
+    app.setActivationPolicy(.regular)
+} else {
+    app.setActivationPolicy(.accessory)
+}
 
 let delegate = AppDelegate()
 app.delegate = delegate

@@ -16,6 +16,15 @@
     <key>CFBundleDisplayName</key>
     <string>SNCF WiFi</string>
 
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>Votre position est utilisée pour détecter automatiquement le réseau WiFi des trains SNCF et économiser la batterie.</string>
+
+    <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+    <string>Votre position est utilisée pour détecter automatiquement le réseau WiFi des trains SNCF et économiser la batterie.</string>
+
+    <key>NSLocationUsageDescription</key>
+    <string>Votre position est utilisée pour détecter automatiquement le réseau WiFi des trains SNCF et économiser la batterie.</string>
+
     <key>CFBundleVersion</key>
     <string>1</string>
 
