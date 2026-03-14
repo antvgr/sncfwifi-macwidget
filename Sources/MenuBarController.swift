@@ -10,6 +10,14 @@ final class MenuBarController: NSObject {
     private var timer: Timer?
     private var lastRawData: [String: Any]?
 
+    // Formatter mis en cache pour éviter les allocations répétées
+    private static let resetTimeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm"
+        formatter.timeZone = .current
+        return formatter
+    }()
+
     // MARK: - Init
 
     override init() {
@@ -269,9 +277,7 @@ final class MenuBarController: NSObject {
 
             if let nextReset = status["next_reset"] as? NSNumber {
                 let resetDate = Date(timeIntervalSince1970: nextReset.doubleValue / 1000.0)
-                let tf = DateFormatter()
-                tf.dateFormat = "HH:mm"
-                tf.timeZone = .current
+                let tf = MenuBarController.resetTimeFormatter
                 m.addItem(label("  Prochain reset : \(tf.string(from: resetDate))"))
             }
         }
