@@ -13,6 +13,8 @@ struct TrainProviderFeatures: OptionSet {
     static let wifiQuality   = TrainProviderFeatures(rawValue: 1 << 5)
     /// Carte du bar-restaurant : ouvre le panneau restaurant du popover.
     static let onboardMenu   = TrainProviderFeatures(rawValue: 1 << 6)
+    /// Le portail n'annonce pas le numéro de train : l'utilisateur le saisit dans les réglages.
+    static let manualTrainNumber = TrainProviderFeatures(rawValue: 1 << 7)
 }
 
 /// Fiche d'identité d'un réseau : tout ce qui ne demande aucun appel réseau.

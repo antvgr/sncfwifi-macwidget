@@ -180,6 +180,7 @@ final class TrainStore: ObservableObject {
     var onOpenDemoPanel: () -> Void = {}
     var onCopyJSON: () -> Void = {}
     var onOpenAbout: () -> Void = {}
+    var onPromptTrainNumber: () -> Void = {}
     /// Ouvre le panneau restaurant, ce qui déclenche le chargement de la carte.
     var onOpenMenu: () -> Void = {}
     var onCloseMenu: () -> Void = {}

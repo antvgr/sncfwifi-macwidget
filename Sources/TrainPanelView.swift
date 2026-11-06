@@ -692,6 +692,11 @@ private struct FooterView: View {
                 Divider()
             }
 
+            if connectedState?.provider.features.contains(.manualTrainNumber) == true {
+                Button("Numéro de train…") { store.onPromptTrainNumber() }
+                Divider()
+            }
+
             if showsArrivalSettings {
                 Button {
                     notifyEnabled.toggle()
