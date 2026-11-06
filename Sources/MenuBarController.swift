@@ -127,6 +127,7 @@ final class MenuBarController: NSObject {
         store.onCopyJSON = { [weak self] in self?.copyDebugData() }
         store.onOpenAbout = { [weak self] in self?.openAbout() }
         store.onOpenMenu = { [weak self] in self?.openOnboardMenu() }
+        store.onPromptTrainNumber = { [weak self] in self?.promptTrainNumber() }
         store.onCloseMenu = { [weak self] in
             guard let self else { return }
             self.store.route = .main
@@ -602,6 +603,32 @@ final class MenuBarController: NSObject {
     @objc private func openDemoControlPanel() {
         guard let url = URL(string: MockTrainData.shared.baseURLString) else { return }
         NSWorkspace.shared.open(url)
+    }
+
+    /// Le portail Nomad n'annonce pas le numéro de train, qui sert à charger la desserte.
+    private func promptTrainNumber() {
+        let alert = NSAlert()
+        alert.messageText = "Numéro de train"
+        alert.informativeText = "Le WiFi de ce train n'indique pas sa desserte. Saisis le numéro "
+            + "(ex. 860519) pour la charger ; laisse vide pour l'effacer."
+        alert.addButton(withTitle: "Valider")
+        alert.addButton(withTitle: "Annuler")
+        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 200, height: 24))
+        field.stringValue = UserDefaults.standard.string(forKey: NomadDataSource.trainNumberKey) ?? ""
+        alert.accessoryView = field
+        alert.window.initialFirstResponder = field
+
+        popover.performClose(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+
+        let digits = field.stringValue.filter(\.isNumber)
+        if digits.isEmpty {
+            UserDefaults.standard.removeObject(forKey: NomadDataSource.trainNumberKey)
+        } else {
+            UserDefaults.standard.set(digits, forKey: NomadDataSource.trainNumberKey)
+        }
+        store.onSettingsChanged()
     }
 
     @objc private func openAbout() {

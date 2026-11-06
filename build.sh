@@ -23,6 +23,7 @@ SWIFT_SOURCES=(
     "${SRC_DIR}/ICEDataSource.swift"
     "${SRC_DIR}/LyriaAPIClient.swift"
     "${SRC_DIR}/LyriaDataSource.swift"
+    "${SRC_DIR}/NomadDataSource.swift"
     "${SRC_DIR}/MenuBarController.swift"
     "${SRC_DIR}/MockTrainData.swift"
     "${SRC_DIR}/StatusBarImageGenerator.swift"
