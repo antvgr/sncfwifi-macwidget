@@ -77,7 +77,13 @@ SSID reconnus : `_SNCF_WIFI_INOUI`, `OUIFI`, `SNCF_WIFI_INTERCITES`, `WIFI_SNCF`
 Toute la flotte Eurostar utilise le portail Icomera « Internet Ombord », que ce soit sur les
 liaisons transmanche ou sur les rames continentales héritées de Thalys.
 
-SSID reconnus : `EurostarWiFi`, `Eurostar WiFi`, `Eurostar`, `_EUROSTAR_WIFI`, `THALYSNET`, `_THALYSNET`
+SSID reconnus : `EurostarWiFi`, `Eurostar WiFi`, `Eurostar`, `EurostarTrainsWifi`, `_EUROSTAR_WIFI`, `THALYSNET`, `_THALYSNET`
+
+> ⚠️ **Support non validé sur toute la flotte.** À bord d'une rame observée le 21 septembre 2026
+> (SSID `EurostarTrainsWifi`), `www.ombord.info` ne se résolvait pas via le DNS embarqué : l'API
+> Icomera n'y était pas joignable. Les relevés ci-dessous viennent d'une rame continentale ; si
+> vous êtes sur une rame où l'hôte ne résout pas, le widget reste « non connecté ». Un relevé du
+> portail réellement servi (nom d'hôte, endpoints) à bord est le bienvenu — voir l'issue 5.
 
 <p align="center">
   <img src="img/eurostar-panel.png" width="42%" />
