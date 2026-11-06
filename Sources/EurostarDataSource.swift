@@ -8,7 +8,7 @@ final class EurostarDataSource: TrainDataSource {
     let descriptor = TrainProviderDescriptor(
         id: "eurostar",
         displayName: "Eurostar",
-        ssids: ["eurostarwifi", "eurostar wifi", "eurostar", "_eurostar_wifi", "thalysnet", "_thalysnet"],
+        ssids: ["eurostarwifi", "eurostar wifi", "eurostar", "eurostartrainswifi", "_eurostar_wifi", "thalysnet", "_thalysnet"],
         accentHex: 0x173D85,
         features: [.speed, .position, .uplink, .dataQuota],
         apiHost: "www.ombord.info",
