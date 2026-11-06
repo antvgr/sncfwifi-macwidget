@@ -1,0 +1,45 @@
+name: CI
+
+# Condition de merge sur main : les deux builds doivent passer (voir scripts/protect_main.sh).
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build (${{ matrix.label }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: Apple Silicon
+            runner: macos-latest
+            native: arm64
+          - label: Intel
+            runner: macos-15-intel
+            native: x86_64
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build SNCFWifi.app
+        run: ./build.sh
+
+      - name: Vérifier le bundle
+        run: |
+          set -euo pipefail
+          archs="$(lipo -archs SNCFWifi.app/Contents/MacOS/SNCFWifi)"
+          echo "Architectures : $archs"
+          # Le binaire est universel : chaque runner doit y retrouver sa propre architecture.
+          grep -qw "${{ matrix.native }}" <<< "$archs"
+          codesign --verify --strict SNCFWifi.app
+          test "$(uname -m)" = "${{ matrix.native }}"
